@@ -96,13 +96,11 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         forceTeleport()
     end
 end)
-
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -135,9 +133,10 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 180, 0, 320)
 frame.Position = UDim2.new(1, -190, 0, 10)
-frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
-frame.BackgroundTransparency = 0.3
+frame.BackgroundColor3 = Color3.fromRGB(255,255,255) -- white ghost
+frame.BackgroundTransparency = 0.85 -- ghost-like transparency
 frame.Active = true
+frame.Draggable = true -- draggable
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
@@ -146,7 +145,7 @@ title.Size = UDim2.new(1,0,0,24)
 title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "LucasMenu2"
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextColor3 = Color3.fromRGB(0,0,0) -- black text for contrast
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
@@ -156,8 +155,9 @@ local function createButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -12, 0, 32)
     btn.Position = UDim2.new(0,6,0,y)
-    btn.BackgroundColor3 = Color3.fromRGB(170,0,0)
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.BackgroundColor3 = Color3.fromRGB(255,255,255) -- white button
+    btn.BackgroundTransparency = 0.6 -- semi-transparent
+    btn.TextColor3 = Color3.fromRGB(0,0,0) -- black text
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.Text = text
@@ -171,7 +171,7 @@ local function createSlider(labelText, min, max, default, y, callback)
     label.Size = UDim2.new(1,0,0,18)
     label.Position = UDim2.new(0,0,0,y)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextColor3 = Color3.fromRGB(0,0,0) -- black text
     label.Font = Enum.Font.Gotham
     label.TextSize = 13
     label.Text = labelText..": "..tostring(default)
@@ -180,13 +180,15 @@ local function createSlider(labelText, min, max, default, y, callback)
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(1, -12, 0, 12)
     bar.Position = UDim2.new(0,6,0,y+20)
-    bar.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    bar.BackgroundColor3 = Color3.fromRGB(200,200,200) -- light ghost grey
+    bar.BackgroundTransparency = 0.6
     bar.Parent = frame
     Instance.new("UICorner", bar).CornerRadius = UDim.new(0,6)
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((default-min)/(max-min),0,1,0)
-    fill.BackgroundColor3 = Color3.fromRGB(0,170,0)
+    fill.BackgroundColor3 = Color3.fromRGB(0,0,0) -- black fill
+    fill.BackgroundTransparency = 0.6
     fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
 
@@ -235,7 +237,7 @@ local function togglePlatform()
             platformPart.Anchored = true
             platformPart.CanCollide = true
             platformPart.Material = Enum.Material.Neon
-            platformPart.Color = Color3.fromRGB(0,0,0)
+            platformPart.Color = Color3.fromRGB(255,255,255) -- ghost white
             platformPart.Position = hrp.Position - Vector3.new(0, hrp.Size.Y/2 + 0.5, 0)
             platformPart.Parent = workspace
         end
