@@ -133,7 +133,7 @@ frame.Position = UDim2.new(1, -190, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85 -- ghost-like
 frame.Active = true
-frame.Draggable = true
+frame.Draggable = false -- <-- made undraggable
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
