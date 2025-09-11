@@ -98,12 +98,11 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 -- Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
--- Character references
+local LocalPlayer = Players.LocalPlayer
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
@@ -114,10 +113,13 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     humanoid = character:WaitForChild("Humanoid")
 end)
 
--- States
-local platformActive, spinbotActive, hiddenFlingActive, headlessActive = false, false, false, false
+-- Variables
+local platformActive = false
 local platformPart = nil
+local spinbotActive = false
 local spinSpeed = 5
+local hiddenFlingActive = false
+local headlessActive = false
 
 -- GUI
 local gui = Instance.new("ScreenGui")
@@ -126,8 +128,8 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 360)
-frame.Position = UDim2.new(1, -230, 0, 10)
+frame.Size = UDim2.new(0, 220, 0, 320)
+frame.Position = UDim2.new(0.5, -110, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85
 frame.Active = true
@@ -145,8 +147,8 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Button helper
-local function createButton(name, y)
+-- Helper function for buttons
+local function createButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -12, 0, 32)
     btn.Position = UDim2.new(0,6,0,y)
@@ -155,13 +157,12 @@ local function createButton(name, y)
     btn.TextColor3 = Color3.fromRGB(0,0,0)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
-    btn.Text = name
+    btn.Text = text
     btn.Parent = frame
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,12)
     return btn
 end
 
--- Slider helper
 local function createSlider(labelText, min, max, default, y, callback)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1,0,0,18)
@@ -214,18 +215,16 @@ local function createSlider(labelText, min, max, default, y, callback)
 end
 
 -- Buttons
-local platformBtn = createButton("Platform: OFF", 40)
-local spinBtn = createButton("Spinbot: OFF", 82)
-local flingBtn = createButton("Touch Fling: OFF", 124)
-local headlessBtn = createButton("Headless: OFF", 166)
+local platformBtn = createButton("Platform: OFF", 36)
+local spinBtn = createButton("Spinbot: OFF", 80)
+local touchFlingBtn = createButton("Touch Fling: OFF", 124)
+local headlessBtn = createButton("Headless: OFF", 168)
+createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 
--- Slider
-createSlider("Spinbot Speed", 1, 50, 5, 210, function(v) spinSpeed=v end)
-
--- Button logic (text-only toggle)
+-- Platform Toggle
 platformBtn.MouseButton1Click:Connect(function()
     platformActive = not platformActive
-    platformBtn.Text = platformActive and "Platform: ON" or "Platform: OFF"
+    platformBtn.Text = "Platform: "..(platformActive and "ON" or "OFF")
     if platformActive then
         if hrp then
             platformPart = Instance.new("Part")
@@ -234,45 +233,64 @@ platformBtn.MouseButton1Click:Connect(function()
             platformPart.CanCollide = true
             platformPart.Material = Enum.Material.Neon
             platformPart.Color = Color3.fromRGB(255,255,255)
-            platformPart.Position = hrp.Position - Vector3.new(0, hrp.Size.Y/2+0.5, 0)
-            platformPart.Parent = Workspace
+            platformPart.Position = hrp.Position - Vector3.new(0, hrp.Size.Y/2 + 0.5, 0)
+            platformPart.Parent = workspace
         end
     else
         if platformPart then platformPart:Destroy(); platformPart=nil end
     end
 end)
 
+-- Spinbot Toggle
 spinBtn.MouseButton1Click:Connect(function()
     spinbotActive = not spinbotActive
-    spinBtn.Text = spinbotActive and "Spinbot: ON" or "Spinbot: OFF"
+    spinBtn.Text = "Spinbot: "..(spinbotActive and "ON" or "OFF")
 end)
 
-flingBtn.MouseButton1Click:Connect(function()
+-- Touch Fling Toggle (Improved)
+touchFlingBtn.MouseButton1Click:Connect(function()
     hiddenFlingActive = not hiddenFlingActive
-    flingBtn.Text = hiddenFlingActive and "Touch Fling: ON" or "Touch Fling: OFF"
+    touchFlingBtn.Text = "Touch Fling: "..(hiddenFlingActive and "ON" or "OFF")
 end)
 
+-- Headless Toggle
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
-    headlessBtn.Text = headlessActive and "Headless: ON" or "Headless: OFF"
-    if headlessActive and character then
-        local head = character:FindFirstChild("Head")
-        if head then
+    headlessBtn.Text = "Headless: "..(headlessActive and "ON" or "OFF")
+    local head = character:FindFirstChild("Head")
+    if head then
+        if headlessActive then
             head.Transparency = 1
             head.CanCollide = false
             local face = head:FindFirstChildWhichIsA("Decal")
             if face then face:Destroy() end
+        else
+            head.Transparency = 0
+            head.CanCollide = true
         end
     end
 end)
 
--- Main loop
+-- Main Loops
 RunService.Heartbeat:Connect(function()
     if platformActive and platformPart and hrp then
         platformPart.Position = Vector3.new(hrp.Position.X, platformPart.Position.Y, hrp.Position.Z)
     end
     if spinbotActive and hrp then
         hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+    end
+end)
+
+-- Improved Touch Fling
+RunService.Heartbeat:Connect(function()
+    if hiddenFlingActive and character and hrp then
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHRP = plr.Character.HumanoidRootPart
+                local direction = (targetHRP.Position - hrp.Position).Unit
+                targetHRP.Velocity = direction * 100 + Vector3.new(0,50,0) -- stronger fling
+            end
+        end
     end
 end)
 
