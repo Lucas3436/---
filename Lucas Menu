@@ -572,7 +572,7 @@ local function createSlider(parent,labelText,minValue,maxValue,defaultValue,y,on
     return {Get=function() return value end, Set=setValue, Label=label}
 end
 
-local flySlider = createSlider(mainPage,"Fly Speed",1,500,flySpeed,102,function(v) flySpeed=v end)
+local flySlider = createSlider(mainPage,"Fly Speed",1,125,flySpeed,102,function(v) flySpeed=v end)
 local infSlider = createSlider(mainPage,"Infinite Jump Force",1,50,50,198,function(v) end)
 local tpSlider = createSlider(settingsPage,"ClickTP Speed",100,5000,tpSpeed,0,function(v) tpSpeed=v end)
 local wsSlider = createSlider(settingsPage,"WalkSpeed",16,200,walkSpeed,60,function(v)
