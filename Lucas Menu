@@ -120,9 +120,6 @@ local spinbotActive = false
 local spinSpeed = 5
 local hiddenFlingActive = false
 local headlessActive = false
-local chamsEnabled = false
-local chamsColor = Color3.fromRGB(0,255,0)
-local chamsObjects = {}
 
 -- GUI
 local gui = Instance.new("ScreenGui")
@@ -222,8 +219,7 @@ local platformBtn = createButton("Platform: OFF", 36)
 local spinBtn = createButton("Spinbot: OFF", 80)
 local touchFlingBtn = createButton("Touch Fling: OFF", 124)
 local headlessBtn = createButton("Headless: OFF", 168)
-local chamsBtn = createButton("Chams: OFF", 212)
-createSlider("Spinbot Speed",1,50,5,256,function(v) spinSpeed=v end)
+createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 
 -- Platform Toggle
 local function togglePlatform()
@@ -290,33 +286,6 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     task.wait(0.1)
     if headlessActive then
         applyHeadless(c)
-    end
-end)
-
--- Chams Toggle
-chamsBtn.MouseButton1Click:Connect(function()
-    chamsEnabled = not chamsEnabled
-    chamsBtn.Text = "Chams: "..(chamsEnabled and "ON" or "OFF")
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            if chamsEnabled then
-                if plr.Character and not chamsObjects[plr] then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Adornee = plr.Character
-                    highlight.FillColor = chamsColor
-                    highlight.OutlineColor = Color3.fromRGB(0,0,0)
-                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    highlight.Enabled = true
-                    highlight.Parent = workspace
-                    chamsObjects[plr] = highlight
-                end
-            else
-                if chamsObjects[plr] then
-                    chamsObjects[plr]:Destroy()
-                    chamsObjects[plr] = nil
-                end
-            end
-        end
     end
 end)
 
