@@ -1,5 +1,104 @@
 -- Services
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Character references
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+LocalPlayer.CharacterAdded:Connect(function(c)
+    character = c
+    hrp = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+end)
+
+-- Position Storage
+local savedPosition = nil
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PositionTPGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 50)
+frame.Position = UDim2.new(0.5, -110, 0, 10) -- Top-center
+frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White
+frame.BackgroundTransparency = 0.85 -- Very transparent (ghost-like)
+frame.Active = true      -- Required to make draggable
+frame.Draggable = true   -- Makes the frame draggable
+frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
+
+-- Save Position Button
+local saveBtn = Instance.new("TextButton")
+saveBtn.Size = UDim2.new(0.5, -5, 1, -10)
+saveBtn.Position = UDim2.new(0, 5, 0, 5)
+saveBtn.Text = "Save Position"
+saveBtn.Font = Enum.Font.GothamBold
+saveBtn.TextSize = 14
+saveBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White buttons
+saveBtn.BackgroundTransparency = 0.6 -- Semi-transparent
+saveBtn.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black text for contrast
+saveBtn.Parent = frame
+Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0,8)
+
+saveBtn.MouseButton1Click:Connect(function()
+    if hrp then
+        savedPosition = hrp.Position
+        saveBtn.Text = "Saved!"
+        task.delay(1, function() saveBtn.Text = "Save Position" end)
+    end
+end)
+
+-- Teleport Button
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.5, -5, 1, -10)
+tpBtn.Position = UDim2.new(0.5, 0, 0, 5)
+tpBtn.Text = "Teleport"
+tpBtn.Font = Enum.Font.GothamBold
+tpBtn.TextSize = 14
+tpBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White buttons
+tpBtn.BackgroundTransparency = 0.6 -- Semi-transparent
+tpBtn.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black text
+tpBtn.Parent = frame
+Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0,8)
+
+-- Force teleport function
+local function forceTeleport()
+    if savedPosition and hrp then
+        local targetCFrame = CFrame.new(savedPosition)
+        local originalCanCollide = hrp.CanCollide
+        hrp.CanCollide = false -- Disable collisions to avoid physics blocking
+
+        -- Force teleport every frame
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if (hrp.Position - savedPosition).Magnitude > 0.1 then
+                hrp.CFrame = targetCFrame
+            else
+                hrp.CanCollide = originalCanCollide
+                connection:Disconnect()
+            end
+        end)
+    end
+end
+
+tpBtn.MouseButton1Click:Connect(forceTeleport)
+
+-- Teleport with "T" key
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.T then
+        forceTeleport()
+    end
+end)
+
+-- Services
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
