@@ -99,9 +99,6 @@ end)
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-
 local LocalPlayer = Players.LocalPlayer
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
@@ -118,7 +115,7 @@ local platformActive = false
 local platformPart = nil
 local spinbotActive = false
 local spinSpeed = 5
-local hiddenFlingActive = false
+local touchFlingActive = false
 local headlessActive = false
 
 -- GUI
@@ -132,8 +129,6 @@ frame.Size = UDim2.new(0, 220, 0, 320)
 frame.Position = UDim2.new(0.5, -110, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85
-frame.Active = true
-frame.Draggable = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
@@ -207,7 +202,7 @@ local function createSlider(labelText, min, max, default, y, callback)
     bar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
     end)
-    UIS.InputChanged:Connect(function(input)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             setValueFromX(input.Position.X)
         end
@@ -247,12 +242,6 @@ spinBtn.MouseButton1Click:Connect(function()
     spinBtn.Text = "Spinbot: "..(spinbotActive and "ON" or "OFF")
 end)
 
--- Touch Fling Toggle (Improved)
-touchFlingBtn.MouseButton1Click:Connect(function()
-    hiddenFlingActive = not hiddenFlingActive
-    touchFlingBtn.Text = "Touch Fling: "..(hiddenFlingActive and "ON" or "OFF")
-end)
-
 -- Headless Toggle
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
@@ -271,6 +260,32 @@ headlessBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Skiddos Touch Fling
+local function touchFlingLoop()
+    local movel = 0.1
+    while true do
+        RunService.Heartbeat:Wait()
+        if touchFlingActive then
+            local c = character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            if c and hrp then
+                local vel = hrp.Velocity
+                hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                RunService.RenderStepped:Wait()
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end
+end
+coroutine.wrap(touchFlingLoop)()
+
+-- Touch Fling Toggle
+touchFlingBtn.MouseButton1Click:Connect(function()
+    touchFlingActive = not touchFlingActive
+    touchFlingBtn.Text = "Touch Fling: "..(touchFlingActive and "ON" or "OFF")
+end)
+
 -- Main Loops
 RunService.Heartbeat:Connect(function()
     if platformActive and platformPart and hrp then
@@ -281,18 +296,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Improved Touch Fling
-RunService.Heartbeat:Connect(function()
-    if hiddenFlingActive and character and hrp then
-        for _,plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local targetHRP = plr.Character.HumanoidRootPart
-                local direction = (targetHRP.Position - hrp.Position).Unit
-                targetHRP.Velocity = direction * 100 + Vector3.new(0,50,0) -- stronger fling
-            end
-        end
-    end
-end)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
