@@ -98,8 +98,14 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 -- Services
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+
+-- Character references
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
@@ -115,7 +121,7 @@ local platformActive = false
 local platformPart = nil
 local spinbotActive = false
 local spinSpeed = 5
-local touchFlingActive = false
+local hiddenFlingActive = false
 local headlessActive = false
 
 -- GUI
@@ -125,15 +131,17 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 320)
-frame.Position = UDim2.new(0.5, -110, 0, 10)
+frame.Size = UDim2.new(0, 180, 0, 320)
+frame.Position = UDim2.new(1, -190, 0, 10) -- Top-right
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85
+frame.Active = true
+frame.Draggable = true -- draggable
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,28)
+title.Size = UDim2.new(1,0,0,24)
 title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "LucasMenu2"
@@ -142,7 +150,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Helper function for buttons
+-- Helper function for buttons (no color change on toggle)
 local function createButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -12, 0, 32)
@@ -202,7 +210,7 @@ local function createSlider(labelText, min, max, default, y, callback)
     bar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
     end)
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
+    UIS.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             setValueFromX(input.Position.X)
         end
@@ -216,10 +224,29 @@ local touchFlingBtn = createButton("Touch Fling: OFF", 124)
 local headlessBtn = createButton("Headless: OFF", 168)
 createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 
--- Platform Toggle
+-- Improved Touch Fling
+local function applyHiddenFling()
+    local lp = LocalPlayer
+    local movel = 0.2
+    RunService.Heartbeat:Connect(function()
+        if hiddenFlingActive then
+            local c = lp.Character
+            if c then
+                local hrp = c:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local vel = hrp.Velocity
+                    hrp.Velocity = Vector3.new(0, 50, 0) + vel * 500
+                    hrp.Velocity += Vector3.new(0, movel, 0)
+                    movel = -movel
+                end
+            end
+        end
+    end)
+end
+
+-- Toggle Buttons
 platformBtn.MouseButton1Click:Connect(function()
     platformActive = not platformActive
-    platformBtn.Text = "Platform: "..(platformActive and "ON" or "OFF")
     if platformActive then
         if hrp then
             platformPart = Instance.new("Part")
@@ -229,64 +256,34 @@ platformBtn.MouseButton1Click:Connect(function()
             platformPart.Material = Enum.Material.Neon
             platformPart.Color = Color3.fromRGB(255,255,255)
             platformPart.Position = hrp.Position - Vector3.new(0, hrp.Size.Y/2 + 0.5, 0)
-            platformPart.Parent = workspace
+            platformPart.Parent = Workspace
         end
     else
         if platformPart then platformPart:Destroy(); platformPart=nil end
     end
 end)
 
--- Spinbot Toggle
 spinBtn.MouseButton1Click:Connect(function()
     spinbotActive = not spinbotActive
-    spinBtn.Text = "Spinbot: "..(spinbotActive and "ON" or "OFF")
 end)
 
--- Headless Toggle
+touchFlingBtn.MouseButton1Click:Connect(function()
+    hiddenFlingActive = not hiddenFlingActive
+    applyHiddenFling()
+end)
+
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
-    headlessBtn.Text = "Headless: "..(headlessActive and "ON" or "OFF")
     local head = character:FindFirstChild("Head")
     if head then
-        if headlessActive then
-            head.Transparency = 1
-            head.CanCollide = false
-            local face = head:FindFirstChildWhichIsA("Decal")
-            if face then face:Destroy() end
-        else
-            head.Transparency = 0
-            head.CanCollide = true
-        end
+        head.Transparency = headlessActive and 1 or 0
+        head.CanCollide = not headlessActive
+        local face = head:FindFirstChildWhichIsA("Decal")
+        if face then face:Destroy() end
     end
 end)
 
--- Skiddos Touch Fling
-local function touchFlingLoop()
-    local movel = 0.1
-    while true do
-        RunService.Heartbeat:Wait()
-        if touchFlingActive then
-            local c = character
-            local hrp = c and c:FindFirstChild("HumanoidRootPart")
-            if c and hrp then
-                local vel = hrp.Velocity
-                hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
-                RunService.RenderStepped:Wait()
-                hrp.Velocity = vel + Vector3.new(0, movel, 0)
-                movel = movel * -1
-            end
-        end
-    end
-end
-coroutine.wrap(touchFlingLoop)()
-
--- Touch Fling Toggle
-touchFlingBtn.MouseButton1Click:Connect(function()
-    touchFlingActive = not touchFlingActive
-    touchFlingBtn.Text = "Touch Fling: "..(touchFlingActive and "ON" or "OFF")
-end)
-
--- Main Loops
+-- Main Loop
 RunService.Heartbeat:Connect(function()
     if platformActive and platformPart and hrp then
         platformPart.Position = Vector3.new(hrp.Position.X, platformPart.Position.Y, hrp.Position.Z)
