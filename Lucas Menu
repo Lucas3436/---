@@ -133,7 +133,7 @@ frame.Position = UDim2.new(1, -190, 0, 10)
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85 -- ghost-like
 frame.Active = true
-frame.Draggable = false -- <-- made undraggable
+frame.Draggable = false -- undraggable
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
@@ -224,9 +224,8 @@ createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 -- Platform Toggle
 local function togglePlatform()
     platformActive = not platformActive
+    platformBtn.Text = platformActive and "Platform: ON" or "Platform: OFF"
     if platformActive then
-        platformBtn.Text = "Platform: ON"
-        platformBtn.BackgroundColor3 = Color3.fromRGB(0,170,0)
         if hrp then
             platformPart = Instance.new("Part")
             platformPart.Size = Vector3.new(6,1,6)
@@ -238,8 +237,6 @@ local function togglePlatform()
             platformPart.Parent = workspace
         end
     else
-        platformBtn.Text = "Platform: OFF"
-        platformBtn.BackgroundColor3 = Color3.fromRGB(170,0,0)
         if platformPart then platformPart:Destroy(); platformPart=nil end
     end
 end
@@ -253,14 +250,12 @@ end)
 spinBtn.MouseButton1Click:Connect(function()
     spinbotActive = not spinbotActive
     spinBtn.Text = spinbotActive and "Spinbot: ON" or "Spinbot: OFF"
-    spinBtn.BackgroundColor3 = spinbotActive and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
 end)
 
 -- Touch Fling Toggle
 touchFlingBtn.MouseButton1Click:Connect(function()
     hiddenFlingActive = not hiddenFlingActive
     touchFlingBtn.Text = hiddenFlingActive and "Touch Fling: ON" or "Touch Fling: OFF"
-    touchFlingBtn.BackgroundColor3 = hiddenFlingActive and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
 end)
 
 -- Headless Toggle
@@ -278,7 +273,6 @@ end
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
     headlessBtn.Text = headlessActive and "Headless: ON" or "Headless: OFF"
-    headlessBtn.BackgroundColor3 = headlessActive and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
     applyHeadless(character)
 end)
 
@@ -321,6 +315,7 @@ coroutine.wrap(function()
         end
     end
 end)()
+
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
