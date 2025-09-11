@@ -103,7 +103,6 @@ local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
 
 -- Character references
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -136,7 +135,7 @@ frame.Position = UDim2.new(1, -190, 0, 10) -- Top-right
 frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
 frame.BackgroundTransparency = 0.85
 frame.Active = true
-frame.Draggable = true -- draggable
+frame.Draggable = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
@@ -150,7 +149,7 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Helper function for buttons (no color change on toggle)
+-- Helper functions
 local function createButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -12, 0, 32)
@@ -224,29 +223,35 @@ local touchFlingBtn = createButton("Touch Fling: OFF", 124)
 local headlessBtn = createButton("Headless: OFF", 168)
 createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 
--- Improved Touch Fling
-local function applyHiddenFling()
-    local lp = LocalPlayer
-    local movel = 0.2
-    RunService.Heartbeat:Connect(function()
-        if hiddenFlingActive then
-            local c = lp.Character
+-- Touch Fling (improved)
+local flingConnection = nil
+local function toggleFling(state)
+    hiddenFlingActive = state
+    if flingConnection then
+        flingConnection:Disconnect()
+        flingConnection = nil
+    end
+    if hiddenFlingActive then
+        local movel = 0.2
+        flingConnection = RunService.Heartbeat:Connect(function()
+            if not hiddenFlingActive then return end
+            local c = LocalPlayer.Character
             if c then
                 local hrp = c:FindFirstChild("HumanoidRootPart")
                 if hrp then
                     local vel = hrp.Velocity
-                    hrp.Velocity = Vector3.new(0, 50, 0) + vel * 500
-                    hrp.Velocity += Vector3.new(0, movel, 0)
+                    hrp.Velocity = vel * 500 + Vector3.new(0, 50 + movel, 0)
                     movel = -movel
                 end
             end
-        end
-    end)
+        end)
+    end
 end
 
 -- Toggle Buttons
 platformBtn.MouseButton1Click:Connect(function()
     platformActive = not platformActive
+    platformBtn.Text = "Platform: "..(platformActive and "ON" or "OFF")
     if platformActive then
         if hrp then
             platformPart = Instance.new("Part")
@@ -265,15 +270,17 @@ end)
 
 spinBtn.MouseButton1Click:Connect(function()
     spinbotActive = not spinbotActive
+    spinBtn.Text = "Spinbot: "..(spinbotActive and "ON" or "OFF")
 end)
 
 touchFlingBtn.MouseButton1Click:Connect(function()
-    hiddenFlingActive = not hiddenFlingActive
-    applyHiddenFling()
+    toggleFling(not hiddenFlingActive)
+    touchFlingBtn.Text = "Touch Fling: "..(hiddenFlingActive and "ON" or "OFF")
 end)
 
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
+    headlessBtn.Text = "Headless: "..(headlessActive and "ON" or "OFF")
     local head = character:FindFirstChild("Head")
     if head then
         head.Transparency = headlessActive and 1 or 0
