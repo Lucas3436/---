@@ -98,12 +98,8 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 -- Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-
--- Character references
+local LocalPlayer = Players.LocalPlayer
 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
@@ -119,7 +115,7 @@ local platformActive = false
 local platformPart = nil
 local spinbotActive = false
 local spinSpeed = 5
-local hiddenFlingActive = false
+local touchFlingActive = false
 local headlessActive = false
 
 -- GUI
@@ -129,33 +125,31 @@ gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 320)
-frame.Position = UDim2.new(1, -190, 0, 10) -- fixed top-right
-frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
-frame.BackgroundTransparency = 0.7
-frame.Active = true
-frame.Draggable = false -- UNDRAGGABLE
+frame.Size = UDim2.new(0, 220, 0, 320)
+frame.Position = UDim2.new(0, 10, 0, 10) -- top-left with 10px margin
+frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
+frame.BackgroundTransparency = 0.85
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,24)
+title.Size = UDim2.new(1,0,0,28)
 title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "LucasMenu2"
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextColor3 = Color3.fromRGB(0,0,0)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.Parent = frame
 
--- Helper functions
+-- Helper function for buttons
 local function createButton(text, y)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -12, 0, 32)
     btn.Position = UDim2.new(0,6,0,y)
-    btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    btn.BackgroundTransparency = 0.7
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    btn.BackgroundTransparency = 0.6
+    btn.TextColor3 = Color3.fromRGB(0,0,0)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
     btn.Text = text
@@ -169,7 +163,7 @@ local function createSlider(labelText, min, max, default, y, callback)
     label.Size = UDim2.new(1,0,0,18)
     label.Position = UDim2.new(0,0,0,y)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextColor3 = Color3.fromRGB(0,0,0)
     label.Font = Enum.Font.Gotham
     label.TextSize = 13
     label.Text = labelText..": "..tostring(default)
@@ -178,15 +172,15 @@ local function createSlider(labelText, min, max, default, y, callback)
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(1, -12, 0, 12)
     bar.Position = UDim2.new(0,6,0,y+20)
-    bar.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    bar.BackgroundTransparency = 0.7
+    bar.BackgroundColor3 = Color3.fromRGB(200,200,200)
+    bar.BackgroundTransparency = 0.6
     bar.Parent = frame
     Instance.new("UICorner", bar).CornerRadius = UDim.new(0,6)
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((default-min)/(max-min),0,1,0)
-    fill.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    fill.BackgroundTransparency = 0.3
+    fill.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    fill.BackgroundTransparency = 0.6
     fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
 
@@ -208,7 +202,7 @@ local function createSlider(labelText, min, max, default, y, callback)
     bar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
     end)
-    UIS.InputChanged:Connect(function(input)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             setValueFromX(input.Position.X)
         end
@@ -222,28 +216,7 @@ local touchFlingBtn = createButton("Touch Fling: OFF", 124)
 local headlessBtn = createButton("Headless: OFF", 168)
 createSlider("Spinbot Speed",1,50,5,212,function(v) spinSpeed=v end)
 
--- Original Touch/WalK Fling (from your code)
-local function touchFlingLoop()
-    local movel = 0.1
-    while true do
-        RunService.Heartbeat:Wait()
-        if hiddenFlingActive then
-            if character and character.Parent then
-                local hrp = character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local vel = hrp.Velocity
-                    hrp.Velocity = vel*10000 + Vector3.new(0,10000,0)
-                    RunService.RenderStepped:Wait()
-                    hrp.Velocity = vel + Vector3.new(0,movel,0)
-                    movel = -movel
-                end
-            end
-        end
-    end
-end
-coroutine.wrap(touchFlingLoop)()
-
--- Button functionality
+-- Platform Toggle
 platformBtn.MouseButton1Click:Connect(function()
     platformActive = not platformActive
     platformBtn.Text = "Platform: "..(platformActive and "ON" or "OFF")
@@ -256,36 +229,64 @@ platformBtn.MouseButton1Click:Connect(function()
             platformPart.Material = Enum.Material.Neon
             platformPart.Color = Color3.fromRGB(255,255,255)
             platformPart.Position = hrp.Position - Vector3.new(0, hrp.Size.Y/2 + 0.5, 0)
-            platformPart.Parent = Workspace
+            platformPart.Parent = workspace
         end
     else
         if platformPart then platformPart:Destroy(); platformPart=nil end
     end
 end)
 
+-- Spinbot Toggle
 spinBtn.MouseButton1Click:Connect(function()
     spinbotActive = not spinbotActive
     spinBtn.Text = "Spinbot: "..(spinbotActive and "ON" or "OFF")
 end)
 
-touchFlingBtn.MouseButton1Click:Connect(function()
-    hiddenFlingActive = not hiddenFlingActive
-    touchFlingBtn.Text = "Touch Fling: "..(hiddenFlingActive and "ON" or "OFF")
-end)
-
+-- Headless Toggle
 headlessBtn.MouseButton1Click:Connect(function()
     headlessActive = not headlessActive
     headlessBtn.Text = "Headless: "..(headlessActive and "ON" or "OFF")
     local head = character:FindFirstChild("Head")
     if head then
-        head.Transparency = headlessActive and 1 or 0
-        head.CanCollide = not headlessActive
-        local face = head:FindFirstChildWhichIsA("Decal")
-        if face then face:Destroy() end
+        if headlessActive then
+            head.Transparency = 1
+            head.CanCollide = false
+            local face = head:FindFirstChildWhichIsA("Decal")
+            if face then face:Destroy() end
+        else
+            head.Transparency = 0
+            head.CanCollide = true
+        end
     end
 end)
 
--- Main Loop
+-- Skiddos Touch Fling
+local function touchFlingLoop()
+    local movel = 0.1
+    while true do
+        RunService.Heartbeat:Wait()
+        if touchFlingActive then
+            local c = character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            if c and hrp then
+                local vel = hrp.Velocity
+                hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+                RunService.RenderStepped:Wait()
+                hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        end
+    end
+end
+coroutine.wrap(touchFlingLoop)()
+
+-- Touch Fling Toggle
+touchFlingBtn.MouseButton1Click:Connect(function()
+    touchFlingActive = not touchFlingActive
+    touchFlingBtn.Text = "Touch Fling: "..(touchFlingActive and "ON" or "OFF")
+end)
+
+-- Main Loops
 RunService.Heartbeat:Connect(function()
     if platformActive and platformPart and hrp then
         platformPart.Position = Vector3.new(hrp.Position.X, platformPart.Position.Y, hrp.Position.Z)
@@ -295,6 +296,25 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Character references
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+LocalPlayer.CharacterAdded:Connect(function(c)
+    character = c
+    humanoid = character:WaitForChild("Humanoid")
+    hrp = character:WaitForChild("HumanoidRootPart")
+end)
 
 --========================
 -- SETTINGS / STATES
