@@ -1,0 +1,602 @@
+-- Advanced Combat Script dengan GUI
+-- Untuk tujuan edukasi saja
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Konfigurasi
+local Config = {
+    RageMode = false,
+    TeleportDistance = 3,
+    PredictionAmount = 0.1,
+    AimSmoothness = 0.3,
+    MaxTargets = 5,
+    CombatRadius = 50,
+    AutoSwitchTarget = true,
+    ShowTargetESP = true,
+    SilentAim = true,
+    TeleportBehind = true
+}
+
+-- Variabel sistem
+local Targets = {}
+local CurrentTarget = nil
+local combatLoopConnection = nil
+local ESPObjects = {}
+local GUI = nil
+
+-- Modul RAGE
+local RageModule = {}
+
+function RageModule:FindOptimalTarget()
+    local closest = nil
+    local shortestDistance = Config.CombatRadius
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                local distance = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closest = player
+                end
+            end
+        end
+    end
+    
+    return closest
+end
+
+function RageModule:CalculateBehindPosition(targetHRP)
+    if not targetHRP then return HumanoidRootPart.Position end
+    
+    local lookVector = targetHRP.CFrame.LookVector
+    local behindOffset = lookVector * -Config.TeleportDistance
+    behindOffset = behindOffset + Vector3.new(0, 2, 0)
+    
+    return targetHRP.Position + behindOffset
+end
+
+function RageModule:SafeTeleport(position)
+    if not Config.TeleportBehind then return false end
+    
+    local ray = Ray.new(position + Vector3.new(0, 10, 0), Vector3.new(0, -20, 0))
+    local hit, hitPos = Workspace:FindPartOnRay(ray, Character)
+    
+    if hit then
+        HumanoidRootPart.CFrame = CFrame.new(Vector3.new(position.X, hitPos.Y + 3, position.Z))
+        return true
+    end
+    return false
+end
+
+function RageModule:CalculateSilentAim(targetHRP)
+    if not Config.SilentAim then 
+        return (targetHRP.Position - HumanoidRootPart.Position).Unit 
+    end
+    
+    if not targetHRP then return HumanoidRootPart.CFrame.LookVector end
+    
+    local velocity = targetHRP.Velocity or Vector3.new(0, 0, 0)
+    local predictedPosition = targetHRP.Position + (velocity * Config.PredictionAmount)
+    
+    local direction = (predictedPosition - HumanoidRootPart.Position).Unit
+    return direction
+end
+
+function RageModule:SimulateAttack(target)
+    if not target or not target.Character then return end
+    
+    -- Simulasi serangan (log saja untuk sekarang)
+    if GUI and GUI.TargetLabel then
+        GUI.TargetLabel.Text = "Target: " .. target.Name
+    end
+end
+
+function RageModule:StartCombatLoop()
+    if combatLoopConnection then
+        combatLoopConnection:Disconnect()
+    end
+    
+    combatLoopConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not Config.RageMode then 
+            if CurrentTarget and GUI.TargetLabel then
+                GUI.TargetLabel.Text = "Target: None"
+            end
+            return 
+        end
+        
+        if not Character or not HumanoidRootPart then return end
+        
+        -- Cari target baru jika perlu
+        if not CurrentTarget or (Config.AutoSwitchTarget and CurrentTarget) then
+            CurrentTarget = RageModule:FindOptimalTarget()
+            if not CurrentTarget then 
+                if GUI.TargetLabel then
+                    GUI.TargetLabel.Text = "Target: None"
+                end
+                return 
+            end
+        end
+        
+        -- Verifikasi target
+        if not CurrentTarget.Character or not CurrentTarget.Character:FindFirstChild("HumanoidRootPart") then
+            CurrentTarget = nil
+            return
+        end
+        
+        local targetHRP = CurrentTarget.Character.HumanoidRootPart
+        
+        -- Teleport ke belakang target
+        if Config.TeleportBehind then
+            local behindPos = RageModule:CalculateBehindPosition(targetHRP)
+            RageModule:SafeTeleport(behindPos)
+        end
+        
+        -- Hitung aim
+        RageModule:CalculateSilentAim(targetHRP)
+        
+        -- Serang target
+        RageModule:SimulateAttack(CurrentTarget)
+        
+        -- Cek jika perlu ganti target
+        local distance = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+        if distance > Config.CombatRadius then
+            CurrentTarget = nil
+        end
+    end)
+end
+
+function RageModule:StopCombatLoop()
+    if combatLoopConnection then
+        combatLoopConnection:Disconnect()
+        combatLoopConnection = nil
+    end
+    CurrentTarget = nil
+end
+
+-- Fungsi ESP (Highlight target)
+function CreateESP(target)
+    if not Config.ShowTargetESP then return end
+    
+    if target.Character then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "TargetESP_" .. target.Name
+        highlight.Parent = target.Character
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        
+        ESPObjects[target.Name] = highlight
+    end
+end
+
+function RemoveESP(targetName)
+    if ESPObjects[targetName] then
+        ESPObjects[targetName]:Destroy()
+        ESPObjects[targetName] = nil
+    end
+end
+
+-- Buat GUI
+function CreateGUI()
+    -- Hancurkan GUI lama jika ada
+    if GUI and GUI.MainFrame then
+        GUI.MainFrame:Destroy()
+    end
+    
+    -- Buat ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CombatGUI"
+    screenGui.Parent = CoreGui
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Frame utama
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 350, 0, 500)
+    mainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+    
+    -- Buat corner radius
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+    
+    -- Shadow
+    local shadow = Instance.new("UIStroke")
+    shadow.Color = Color3.fromRGB(0, 0, 0)
+    shadow.Thickness = 2
+    shadow.Transparency = 0.7
+    shadow.Parent = mainFrame
+    
+    -- Title bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+    
+    local titleText = Instance.new("TextLabel")
+    titleText.Name = "TitleText"
+    titleText.Size = UDim2.new(1, -10, 1, 0)
+    titleText.Position = UDim2.new(0, 10, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "⚔️ COMBAT SYSTEM v2.0"
+    titleText.TextColor3 = Color3.fromRGB(255, 50, 50)
+    titleText.TextSize = 18
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.Parent = titleBar
+    
+    -- Close button
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0.5, -15)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextSize = 14
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = titleBar
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 4)
+    closeCorner.Parent = closeButton
+    
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        GUI = nil
+    end)
+    
+    -- Drag functionality
+    local dragging = false
+    local dragInput, dragStart, startPos
+    
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    titleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, 
+                                          startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    -- Scrollable content
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "ScrollFrame"
+    scrollFrame.Size = UDim2.new(1, -20, 1, -60)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 6
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
+    scrollFrame.Parent = mainFrame
+    
+    -- Target status
+    local targetLabel = Instance.new("TextLabel")
+    targetLabel.Name = "TargetLabel"
+    targetLabel.Size = UDim2.new(1, 0, 0, 30)
+    targetLabel.Position = UDim2.new(0, 0, 0, 10)
+    targetLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    targetLabel.BackgroundTransparency = 0.2
+    targetLabel.Text = "Target: None"
+    targetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    targetLabel.TextSize = 14
+    targetLabel.Font = Enum.Font.Gotham
+    targetLabel.Parent = scrollFrame
+    
+    local targetCorner = Instance.new("UICorner")
+    targetCorner.CornerRadius = UDim.new(0, 6)
+    targetCorner.Parent = targetLabel
+    
+    -- Toggle buttons container
+    local yOffset = 50
+    
+    -- Function to create toggle
+    local function CreateToggle(name, defaultValue, callback, description)
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Name = name .. "Toggle"
+        toggleFrame.Size = UDim2.new(1, 0, 0, 60)
+        toggleFrame.Position = UDim2.new(0, 0, 0, yOffset)
+        toggleFrame.BackgroundTransparency = 1
+        toggleFrame.Parent = scrollFrame
+        
+        local toggleLabel = Instance.new("TextLabel")
+        toggleLabel.Name = "Label"
+        toggleLabel.Size = UDim2.new(0.7, 0, 0, 30)
+        toggleLabel.Position = UDim2.new(0, 0, 0, 0)
+        toggleLabel.BackgroundTransparency = 1
+        toggleLabel.Text = name
+        toggleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        toggleLabel.TextSize = 16
+        toggleLabel.Font = Enum.Font.GothamMedium
+        toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        toggleLabel.Parent = toggleFrame
+        
+        local descLabel = Instance.new("TextLabel")
+        descLabel.Name = "Description"
+        descLabel.Size = UDim2.new(0.7, 0, 0, 20)
+        descLabel.Position = UDim2.new(0, 0, 0, 30)
+        descLabel.BackgroundTransparency = 1
+        descLabel.Text = description
+        descLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        descLabel.TextSize = 12
+        descLabel.Font = Enum.Font.Gotham
+        descLabel.TextXAlignment = Enum.TextXAlignment.Left
+        descLabel.Parent = toggleFrame
+        
+        local toggleButton = Instance.new("TextButton")
+        toggleButton.Name = "ToggleButton"
+        toggleButton.Size = UDim2.new(0, 50, 0, 30)
+        toggleButton.Position = UDim2.new(1, -60, 0, 15)
+        toggleButton.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        toggleButton.Text = defaultValue and "ON" or "OFF"
+        toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggleButton.TextSize = 12
+        toggleButton.Font = Enum.Font.GothamBold
+        toggleButton.Parent = toggleFrame
+        
+        local toggleCorner = Instance.new("UICorner")
+        toggleCorner.CornerRadius = UDim.new(0, 6)
+        toggleCorner.Parent = toggleButton
+        
+        toggleButton.MouseButton1Click:Connect(function()
+            local newValue = not defaultValue
+            defaultValue = newValue
+            toggleButton.BackgroundColor3 = newValue and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+            toggleButton.Text = newValue and "ON" or "OFF"
+            callback(newValue)
+        end)
+        
+        yOffset = yOffset + 70
+        return toggleFrame
+    end
+    
+    -- Buat semua toggle
+    CreateToggle("RAGE Mode", Config.RageMode, function(value)
+        Config.RageMode = value
+        if value then
+            RageModule:StartCombatLoop()
+        else
+            RageModule:StopCombatLoop()
+        end
+    end, "Aktifkan mode combat otomatis")
+    
+    CreateToggle("Teleport Behind", Config.TeleportBehind, function(value)
+        Config.TeleportBehind = value
+    end, "Teleport ke belakang target")
+    
+    CreateToggle("Silent Aim", Config.SilentAim, function(value)
+        Config.SilentAim = value
+    end, "Aktifkan aim prediksi")
+    
+    CreateToggle("Target ESP", Config.ShowTargetESP, function(value)
+        Config.ShowTargetESP = value
+        if value then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and CurrentTarget == player then
+                    CreateESP(player)
+                end
+            end
+        else
+            for name, _ in pairs(ESPObjects) do
+                RemoveESP(name)
+            end
+        end
+    end, "Highlight target saat ini")
+    
+    CreateToggle("Auto Switch", Config.AutoSwitchTarget, function(value)
+        Config.AutoSwitchTarget = value
+    end, "Ganti target otomatis")
+    
+    -- Slider untuk jarak
+    yOffset = yOffset + 20
+    
+    local distanceFrame = Instance.new("Frame")
+    distanceFrame.Name = "DistanceSliderFrame"
+    distanceFrame.Size = UDim2.new(1, 0, 0, 70)
+    distanceFrame.Position = UDim2.new(0, 0, 0, yOffset)
+    distanceFrame.BackgroundTransparency = 1
+    distanceFrame.Parent = scrollFrame
+    
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Name = "DistanceLabel"
+    distanceLabel.Size = UDim2.new(1, 0, 0, 25)
+    distanceLabel.Position = UDim2.new(0, 0, 0, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = "Jarak Combat: " .. Config.CombatRadius
+    distanceLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    distanceLabel.TextSize = 14
+    distanceLabel.Font = Enum.Font.GothamMedium
+    distanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+    distanceLabel.Parent = distanceFrame
+    
+    local slider = Instance.new("Frame")
+    slider.Name = "Slider"
+    slider.Size = UDim2.new(1, 0, 0, 20)
+    slider.Position = UDim2.new(0, 0, 0, 30)
+    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    slider.Parent = distanceFrame
+    
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 10)
+    sliderCorner.Parent = slider
+    
+    local fill = Instance.new("Frame")
+    fill.Name = "Fill"
+    fill.Size = UDim2.new((Config.CombatRadius - 10) / 100, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    fill.BorderSizePixel = 0
+    fill.Parent = slider
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 10)
+    fillCorner.Parent = fill
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Name = "SliderButton"
+    sliderButton.Size = UDim2.new(1, 0, 1, 0)
+    sliderButton.BackgroundTransparency = 1
+    sliderButton.Text = ""
+    sliderButton.Parent = slider
+    
+    sliderButton.MouseButton1Down:Connect(function()
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            local mousePos = UserInputService:GetMouseLocation().X
+            local absolutePos = slider.AbsolutePosition.X
+            local absoluteSize = slider.AbsoluteSize.X
+            
+            local relativePos = math.clamp(mousePos - absolutePos, 0, absoluteSize)
+            local percentage = relativePos / absoluteSize
+            
+            local newValue = math.floor(10 + (percentage * 90))
+            Config.CombatRadius = newValue
+            distanceLabel.Text = "Jarak Combat: " .. newValue
+            fill.Size = UDim2.new(percentage, 0, 1, 0)
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                connection:Disconnect()
+            end
+        end)
+    end)
+    
+    yOffset = yOffset + 80
+    
+    -- Tombol reset
+    local resetButton = Instance.new("TextButton")
+    resetButton.Name = "ResetButton"
+    resetButton.Size = UDim2.new(1, 0, 0, 40)
+    resetButton.Position = UDim2.new(0, 0, 0, yOffset)
+    resetButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+    resetButton.Text = "RESET SYSTEM"
+    resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    resetButton.TextSize = 14
+    resetButton.Font = Enum.Font.GothamBold
+    resetButton.Parent = scrollFrame
+    
+    local resetCorner = Instance.new("UICorner")
+    resetCorner.CornerRadius = UDim.new(0, 6)
+    resetCorner.Parent = resetButton
+    
+    resetButton.MouseButton1Click:Connect(function()
+        RageModule:StopCombatLoop()
+        Config.RageMode = false
+        CurrentTarget = nil
+        
+        for name, _ in pairs(ESPObjects) do
+            RemoveESP(name)
+        end
+        
+        if GUI and GUI.TargetLabel then
+            GUI.TargetLabel.Text = "Target: None"
+        end
+        
+        -- Reset semua toggle
+        for _, child in pairs(scrollFrame:GetChildren()) do
+            if child:FindFirstChild("ToggleButton") then
+                child.ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+                child.ToggleButton.Text = "OFF"
+            end
+        end
+        
+        print("System reset!")
+    end)
+    
+    -- Update canvas size
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, yOffset + 60)
+    
+    -- Simpan referensi GUI
+    GUI = {
+        MainFrame = mainFrame,
+        TargetLabel = targetLabel,
+        ScreenGui = screenGui
+    }
+    
+    return screenGui
+end
+
+-- Keyboard shortcut untuk toggle GUI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.KeyCode == Enum.KeyCode.RightControl then
+            if GUI and GUI.MainFrame then
+                GUI.ScreenGui:Destroy()
+                GUI = nil
+            else
+                CreateGUI()
+            end
+        end
+    end
+end)
+
+-- Inisialisasi
+print("Combat System Loaded!")
+print("Press RightControl to toggle GUI")
+
+-- Buat GUI pertama kali
+CreateGUI()
+
+-- Event untuk karakter berubah
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    HumanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+-- Kembalikan modul untuk akses eksternal
+return {
+    Rage = RageModule,
+    Config = Config,
+    CreateGUI = CreateGUI,
+    ToggleRage = function(state)
+        Config.RageMode = state
+        if state then
+            RageModule:StartCombatLoop()
+        else
+            RageModule:StopCombatLoop()
+        end
+    end
+}
